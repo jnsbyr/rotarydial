@@ -8,7 +8,7 @@ Arduino as ISP to upload the firmware to attiny85/atmega88/atmega8.
 Later I will add tutorials for the development environment.
 
 # Hardware construction
-attiny85 with 8Mhz crystal.
+attiny85 with 8Mhz crystal. (Change auc_frequency in dtmf.c and T0_OVERFLOW_PER_MS accordingly when the clock frequency are set differently.)
 
 # Telephone
 My main target phone is a Japanese model [600-A2](http://bunka.nii.ac.jp/heritages/detail/233568).
