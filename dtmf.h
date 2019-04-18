@@ -37,8 +37,8 @@
 #define TIMER_CLK_DIV1              0x01    ///< Timer clocked at F_CPU
 #define TIMER_PRESCALE_MASK0        0x07    ///< Timer Prescaler Bit-Mask
 #define NUM_SAMPLES                 128     // Number of samples in lookup table
-// PWM frequency = 4Mhz/256 = 15625Hz; overflow cycles per MS = 15
-#define T0_OVERFLOW_PER_MS  15
+// PWM frequency = 8Mhz/256 = 31250; overflow cycles per MS = 31
+#define T0_OVERFLOW_PER_MS  31
 
 #define PIN_PWM_OUT                 PB0     // PB0 (OC0A) as PWM output
 
