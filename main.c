@@ -31,8 +31,8 @@
 
 #include "dtmf.h" 
 
-#define PIN_DIAL                    PB1
-#define PIN_PULSE                   PB2
+#define PIN_DIAL                    PB2
+#define PIN_PULSE                   PB1
 
 #define SF_DELAY_MS                 2000L
 #define PG_DELAY_MS                 4000L
