@@ -26,7 +26,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
-#include <avr/wdt.h>
 #include <util/delay.h>
 #include <avr/eeprom.h>
 
@@ -35,7 +34,9 @@
 #define PIN_DIAL                    PB1
 #define PIN_PULSE                   PB2
 
-#define SPEED_DIAL_SIZE             32
+#define SF_DELAY_MS                 2000L
+#define PG_DELAY_MS                 4000L
+#define SPEED_DIAL_SIZE             30
 
 #define STATE_DIAL                  0x00
 #define STATE_SPECIAL_L1            0x01
@@ -45,11 +46,6 @@
 #define F_NONE                      0x00
 #define F_DETECT_SPECIAL_L1         0x01
 #define F_DETECT_SPECIAL_L2         0x02
-#define F_WDT_AWAKE                 0x04
-
-#define SLEEP_64MS                  0x00
-#define SLEEP_128MS                 0x01
-#define SLEEP_2S                    0x02
 
 #define SPEED_DIAL_COUNT            8 // 8 Positions in total (Redail(3),4,5,6,7,8,9,0)
 #define SPEED_DIAL_REDIAL           (SPEED_DIAL_COUNT - 1)
@@ -73,9 +69,6 @@ static void init(void);
 static void process_dialed_digit(runstate_t *rs);
 static void dial_speed_dial_number(int8_t *speed_dial_digits, int8_t index);
 static void write_current_speed_dial(int8_t *speed_dial_digits, int8_t index);
-static void wdt_timer_start(uint8_t delay);
-static void start_sleep(void);
-static void wdt_stop(void);
 
 // Map speed dial numbers to memory locations
 const int8_t _g_speed_dial_loc[] =
@@ -101,12 +94,6 @@ int main(void)
     bool dial_pin_prev_state;
 
     init();
-
-    // Wait for the decoupling capacitors to charge
-    wdt_timer_start(SLEEP_128MS);
-    start_sleep();
-    wdt_stop();
-
     dtmf_init();
 
     // Local dial status variables 
@@ -133,8 +120,7 @@ int main(void)
                 rs->flags |= F_DETECT_SPECIAL_L1;
                 rs->dialed_digit = 0;
 
-                wdt_timer_start(SLEEP_64MS);
-                start_sleep();
+                sleep_ms(50);
             }
             else 
             {
@@ -146,20 +132,14 @@ int main(void)
                 {
                     // Should never happen - no pulses detected OR count more than 10 pulses
                     rs->dialed_digit = DIGIT_OFF;                    
-                    
                     // Do nothing
-                    wdt_timer_start(SLEEP_64MS);
-                    start_sleep();
+                    sleep_ms(50);
                 }
                 else 
                 {
                     // Got a valid digit - process it            
                     if (rs->dialed_digit == 10)
                         rs->dialed_digit = 0; // 10 pulses => 0
-
-                    wdt_timer_start(SLEEP_128MS);
-                    start_sleep();
-                    wdt_stop();
 
                     process_dialed_digit(rs);
                 }
@@ -182,15 +162,14 @@ int main(void)
         // Don't power down if special function detection is active        
         if (rs->flags & F_DETECT_SPECIAL_L1)
         {
-            // Put MCU to sleep - to be awoken either by pin interrupt or WDT
-            wdt_timer_start(SLEEP_2S);
-            start_sleep();
+            // SF detection in progress - we need timer to run (IDLE mode)
+            set_sleep_mode(SLEEP_MODE_IDLE);        
+            sleep_mode();
 
             // Special function mode detected?
-            if (rs->flags & F_WDT_AWAKE)
+            if (_g_delay_counter >= SF_DELAY_MS * T0_OVERFLOW_PER_MS)
             {
                 // SF mode detected
-                rs->flags &= ~F_WDT_AWAKE;
                 rs->state = STATE_SPECIAL_L1;
                 rs->flags &= ~F_DETECT_SPECIAL_L1;
                 rs->flags |= F_DETECT_SPECIAL_L2;
@@ -201,14 +180,12 @@ int main(void)
         }
         else if (rs->flags & F_DETECT_SPECIAL_L2)
         {
-            // Put MCU to sleep - to be awoken either by pin interrupt or WDT
-            wdt_timer_start(SLEEP_2S);
-            start_sleep();
+            set_sleep_mode(SLEEP_MODE_IDLE);        
+            sleep_mode();
 
-            if (rs->flags & F_WDT_AWAKE)
+            if (_g_delay_counter >= PG_DELAY_MS * T0_OVERFLOW_PER_MS)
             {
                 // SF mode detected
-                rs->flags &= ~F_WDT_AWAKE;
                 rs->state = STATE_SPECIAL_L2;
                 rs->flags &= ~F_DETECT_SPECIAL_L2;
 
@@ -344,67 +321,20 @@ static void init(void)
 {
     // Program clock prescaller to divide + frequency by 1
     // Write CLKPCE 1 and other bits 0    
-    CLKPR = _BV(CLKPCE);
-
+    CLKPR = _BV(CLKPCE);    
     // Write prescaler value with CLKPCE = 0
-    CLKPR = 0;
-
-    // Enable pull-ups
-    PORTB |= (_BV(PIN_DIAL) | _BV(PIN_PULSE));
-
+    CLKPR = 0x00;
+    // Disable Pull-ups - external HW debounce
+    PORTB = 0;
     // Disable unused modules to save power
     PRR = _BV(PRTIM1) | _BV(PRUSI) | _BV(PRADC);
     ACSR = _BV(ACD);
-
     // Configure pin change interrupt
     MCUCR = _BV(ISC01) | _BV(ISC00);         // Set INT0 for falling edge detection
     GIMSK = _BV(INT0) | _BV(PCIE);           // Added INT0
     PCMSK = _BV(PIN_DIAL) | _BV(PIN_PULSE);
-
     // Enable interrupts
     sei();                              
-}
-
-static void wdt_timer_start(uint8_t delay)
-{
-    wdt_reset();
-    cli();
-    MCUSR = 0x00;
-    WDTCR |= _BV(WDCE) | _BV(WDE);
-    switch (delay)
-    {
-        case SLEEP_64MS:
-            WDTCR = _BV(WDIE) | _BV(WDP1);
-            break;
-        case SLEEP_128MS:
-            WDTCR = _BV(WDIE) | _BV(WDP1) | _BV(WDP0);
-            break;
-        case SLEEP_2S:
-            WDTCR = _BV(WDIE) | _BV(WDP0) | _BV(WDP1) | _BV(WDP2); // 2048ms
-            break;
-    }
-    sei();
-}
-
-static void wdt_stop(void)
-{
-    wdt_reset();
-    cli();
-    MCUSR = 0x00;
-    WDTCR |= _BV(WDCE) | _BV(WDE);
-    WDTCR = 0x00;
-    sei();
-}
-
-static void start_sleep(void)
-{
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-    cli();                          // stop interrupts to ensure the BOD timed sequence executes as required
-    sleep_enable();
-    sleep_bod_disable();            // disable brown-out detection (good for 20-25µA)
-    sei();                          // ensure interrupts enabled so we can wake up again
-    sleep_cpu();                    // go to sleep
-    sleep_disable();                // wake up here
 }
 
 // Handler for external interrupt on INT0 (PB2, pin 7)
@@ -419,18 +349,17 @@ ISR(INT0_vect)
     }
 }
 
+// Interrupt handlers updated to new code convention
 // Interrupt initiated by pin change on any enabled pin
 ISR(PCINT0_vect)
 {
+    // Do nothing, just wake up MCU
+    _delay_us(1);
 }
 
 // Handler for any unspecified 'bad' interrupts
 ISR(BADISR_vect)
 {
     // Do nothing, just wake up MCU
-}
-
-ISR(WDT_vect)
-{
-    _g_run_state.flags |= F_WDT_AWAKE;
+    _delay_us(1);
 }
