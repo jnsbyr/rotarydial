@@ -32,7 +32,7 @@
 #define DIGIT_STAR          10
 #define DIGIT_POUND         11
 
-#define DTMF_DURATION_MS    100
+#define DTMF_DURATION_MS    500
 
 #define TIMER_CLK_DIV1              0x01    ///< Timer clocked at F_CPU
 #define TIMER_PRESCALE_MASK0        0x07    ///< Timer Prescaler Bit-Mask
