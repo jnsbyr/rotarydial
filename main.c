@@ -398,7 +398,7 @@ static void wdt_stop(void)
 
 static void start_sleep(void)
 {
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    set_sleep_mode(SLEEP_MODE_IDLE);
     cli();                          // stop interrupts to ensure the BOD timed sequence executes as required
     sleep_enable();
     sleep_bod_disable();            // disable brown-out detection (good for 20-25µA)
