@@ -344,7 +344,10 @@ static void init(void)
 {
     // Program clock prescaller to divide + frequency by 1
     // Write CLKPCE 1 and other bits 0    
-    CLKPR = _BV(CLKPCE) | _BV(CLKPS0);
+    CLKPR = _BV(CLKPCE);
+
+    // Write prescaler value with CLKPCE = 0
+    CLKPR = 0;
 
     // Enable pull-ups
     PORTB |= (_BV(PIN_DIAL) | _BV(PIN_PULSE));
