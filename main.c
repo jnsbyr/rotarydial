@@ -105,14 +105,14 @@ int main(void)
     runstate_t *rs = &_g_run_state;
     bool dial_pin_prev_state;
 
-    init();
 
     // Wait for the decoupling capacitors to charge
-    wdt_timer_start(SLEEP_128MS);
-    start_sleep();
-    wdt_stop();
-
+    //wdt_timer_start(SLEEP_128MS);
+    //start_sleep();
+    //wdt_stop();
+    _delay_ms(128);
     dtmf_init();
+    init();
 
     // Local dial status variables 
     rs->state = STATE_DIAL;
@@ -405,43 +405,43 @@ static void init(void)
     sei();                              
 }
 
-static void wdt_timer_start(uint8_t delay)
-{
-    wdt_reset();
-    cli();
-    MCUSR = 0x00;
-    WDTCR |= _BV(WDCE) | _BV(WDE);
-    switch (delay)
-    {
-        case SLEEP_64MS:
-            WDTCR = _BV(WDIE) | _BV(WDP1);
-            break;
-        case SLEEP_128MS:
-            WDTCR = _BV(WDIE) | _BV(WDP1) | _BV(WDP0);
-            break;
-        case SLEEP_2S:
-            WDTCR = _BV(WDIE) | _BV(WDP0) | _BV(WDP1) | _BV(WDP2); // 2048ms
-            break;
-    }
-    sei();
-}
-
-static void wdt_stop(void)
-{
-    wdt_reset();
-    cli();
-    MCUSR = 0x00;
-    WDTCR |= _BV(WDCE) | _BV(WDE);
-    WDTCR = 0x00;
-    sei();
-}
+//static void wdt_timer_start(uint8_t delay)
+//{
+//    wdt_reset();
+//    cli();
+//    MCUSR = 0x00;
+//    WDTCR |= _BV(WDCE) | _BV(WDE);
+//    switch (delay)
+//    {
+//        case SLEEP_64MS:
+//            WDTCR = _BV(WDIE) | _BV(WDP1);
+//            break;
+//        case SLEEP_128MS:
+//            WDTCR = _BV(WDIE) | _BV(WDP1) | _BV(WDP0);
+//            break;
+//        case SLEEP_2S:
+//            WDTCR = _BV(WDIE) | _BV(WDP0) | _BV(WDP1) | _BV(WDP2); // 2048ms
+//            break;
+//    }
+//    sei();
+//}
+//
+//static void wdt_stop(void)
+//{
+//    wdt_reset();
+//    cli();
+//    MCUSR = 0x00;
+//    WDTCR |= _BV(WDCE) | _BV(WDE);
+//    WDTCR = 0x00;
+//    sei();
+//}
 
 static void start_sleep(void)
 {
     set_sleep_mode(SLEEP_MODE_IDLE);
     cli();                          // stop interrupts to ensure the BOD timed sequence executes as required
     sleep_enable();
-    sleep_bod_disable();            // disable brown-out detection (good for 20-25µA)
+    //sleep_bod_disable();            // disable brown-out detection (good for 20-25µA)
     sei();                          // ensure interrupts enabled so we can wake up again
     sleep_cpu();                    // go to sleep
     sleep_disable();                // wake up here
@@ -454,12 +454,12 @@ ISR(INT0_vect)
 }
 
 // Handler for any unspecified 'bad' interrupts
-ISR(BADISR_vect)
-{
-    // Do nothing, just wake up MCU
-}
-
-ISR(WDT_vect)
-{
-    _g_run_state.flags |= F_WDT_AWAKE;
-}
+//ISR(BADISR_vect)
+//{
+//    // Do nothing, just wake up MCU
+//}
+//
+//ISR(WDT_vect)
+//{
+//    _g_run_state.flags |= F_WDT_AWAKE;
+//}
