@@ -32,8 +32,10 @@
 
 #include "dtmf.h" 
 
-#define PIN_DIAL                    PB1
-#define PIN_PULSE                   PB2
+#define PIN_DIAL                    PB2
+#define PIN_PULSE                   PB1
+#define PINBUF_CHANGED_UP(x_)       (((x_) & 0b11000111) == 0b00000111)
+#define PINBUF_CHANGED_DOWN(x_)     (((x_) & 0b11000111) == 0b11000000)
 
 #define SPEED_DIAL_SIZE             32
 
@@ -67,6 +69,9 @@ typedef struct
     uint8_t speed_dial_digit_index;
     int8_t speed_dial_digits[SPEED_DIAL_SIZE];
     int8_t dialed_digit;
+    uint8_t dial_pinbuf;
+    uint8_t pulse_pinbuf;
+    bool dial_pin_down;
 } runstate_t;
 
 static void init(void);
@@ -120,8 +125,42 @@ int main(void)
     for (uint8_t i = 0; i < SPEED_DIAL_SIZE; i++)
         rs->speed_dial_digits[i] = DIGIT_OFF;
 
-    while (1)
-    {
+    rs->dial_pinbuf = 0b11111111;
+    rs->dial_pin_down = false;
+    rs->pulse_pinbuf = 0b00000000;
+    for (;;) {
+        start_sleep();
+        // When wake up with INT0, INT0 bit is cleared in GIMSK.
+        // XXX: add a loop limit here?
+        while (!PINBUF_CHANGED_DOWN(rs->dial_pinbuf)) {
+            rs->dial_pinbuf = (rs->dial_pinbuf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
+            _delay_us(100);
+        }
+        rs->dial_pinbuf = 0b00000000;
+        rs->dial_pin_down = true;
+        while (rs->dial_pin_down) {
+            rs->pulse_pinbuf = (rs->pulse_pinbuf << 1) | (bit_is_set(PINB, PIN_PULSE) >> PIN_PULSE);
+            if (PINBUF_CHANGED_UP(rs->pulse_pinbuf)) {
+                rs->pulse_pinbuf = 0b11111111;
+                rs->dialed_digit++;
+            }
+            _delay_us(100);
+            rs->dial_pinbuf = (rs->dial_pinbuf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
+            if (PINBUF_CHANGED_UP(rs->dial_pinbuf)) {
+                rs->dial_pinbuf = 0b11111111;
+                rs->dial_pin_down = false;
+            }
+        }
+        if (rs->dialed_digit > 0 && rs->dialed_digit <= 10) {
+            if (rs->dialed_digit == 10)
+                rs->dialed_digit = 0;
+            process_dialed_digit(rs);
+        }
+        rs->dialed_digit = 0;
+        // re-enable INT0.
+        GIMSK = _BV(INT0);
+    }
+#if 0
         rs->dial_pin_state = bit_is_set(PINB, PIN_DIAL);
 
         if (dial_pin_prev_state != rs->dial_pin_state) 
@@ -223,7 +262,7 @@ int main(void)
             sleep_mode();
         }
     }
-
+#endif
     return 0;
 }
 
@@ -357,9 +396,10 @@ static void init(void)
     ACSR = _BV(ACD);
 
     // Configure pin change interrupt
-    MCUCR = _BV(ISC01) | _BV(ISC00);         // Set INT0 for falling edge detection
-    GIMSK = _BV(INT0) | _BV(PCIE);           // Added INT0
-    PCMSK = _BV(PIN_DIAL) | _BV(PIN_PULSE);
+    //MCUCR = _BV(ISC01) | _BV(ISC00);         // Set INT0 for falling edge detection
+    GIMSK = _BV(INT0);
+    //GIMSK = _BV(INT0) | _BV(PCIE);           // Added INT0
+    //PCMSK = _BV(PIN_DIAL) | _BV(PIN_PULSE);
 
     // Enable interrupts
     sei();                              
@@ -410,18 +450,7 @@ static void start_sleep(void)
 // Handler for external interrupt on INT0 (PB2, pin 7)
 ISR(INT0_vect)
 {
-    if (!_g_run_state.dial_pin_state)
-    {
-        // Disabling SF detection
-        _g_run_state.flags = F_NONE;
-        // A pulse just started
-        _g_run_state.dialed_digit++;
-    }
-}
-
-// Interrupt initiated by pin change on any enabled pin
-ISR(PCINT0_vect)
-{
+    GIMSK = 0;
 }
 
 // Handler for any unspecified 'bad' interrupts
