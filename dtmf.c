@@ -206,7 +206,7 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
     _g_stepwidth_a = 0;
     _g_stepwidth_b = 0;
 
-    GIMSK = _BV(INT0) | _BV(PCIE); 
+    GIMSK = _BV(INT0);
 }
 
 // Enable PWM output by configuring compare match mode - non inverting PWM
