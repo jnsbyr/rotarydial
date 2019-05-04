@@ -119,7 +119,8 @@ void update_pin(pin_t *pin, uint16_t reg, uint8_t bit)
         pin->buf = 0b11111111;
         pin->high = true;
         pin->changed = true;
-    }
+    } else
+        pin->changed = false;
 }
 
 int main(void)
@@ -167,11 +168,9 @@ int main(void)
         rs->dial_pin.buf = 0b00000000;
         rs->dial_pin.high = false;
         while (!rs->dial_pin.high) {
-            rs->pulse_pin.buf = (rs->pulse_pin.buf << 1) | (bit_is_set(PINB, PIN_PULSE) >> PIN_PULSE);
-            if (PINBUF_CHANGED_HIGH(rs->pulse_pin.buf)) {
-                rs->pulse_pin.buf = 0b11111111;
+            update_pin(&rs->pulse_pin, PINB, PIN_PULSE);
+            if (rs->pulse_pin.high && rs->pulse_pin.changed)
                 rs->dialed_digit++;
-            }
             _delay_us(100);
             update_pin(&rs->dial_pin, PINB, PIN_DIAL);
         }
