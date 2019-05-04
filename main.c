@@ -62,6 +62,14 @@
 
 typedef struct
 {
+    uint16_t reg;
+    uint8_t bit;
+    uint8_t buf;
+    bool high;
+} pin_t;
+
+typedef struct
+{
     uint8_t state;
     uint8_t flags;
     bool dial_pin_state;
@@ -69,10 +77,8 @@ typedef struct
     uint8_t speed_dial_digit_index;
     int8_t speed_dial_digits[SPEED_DIAL_SIZE];
     int8_t dialed_digit;
-    uint8_t dial_pinbuf;
-    uint8_t pulse_pinbuf;
-    bool dial_pin_high;
-    bool pulse_pin_high;
+    pin_t dial_pin;
+    pin_t pulse_pin;
 } runstate_t;
 
 static void init(void);
@@ -122,44 +128,44 @@ int main(void)
     rs->speed_dial_digit_index = 0;
     rs->speed_dial_index = 0;
     dial_pin_prev_state = true;
+    rs->dial_pin.buf = 0b11111111;
+    rs->dial_pin.high = true;
+    rs->pulse_pin.buf = 0b00000000;
     
     for (uint8_t i = 0; i < SPEED_DIAL_SIZE; i++)
         rs->speed_dial_digits[i] = DIGIT_OFF;
 
-    rs->dial_pinbuf = 0b11111111;
-    rs->dial_pin_high = true;
-    rs->pulse_pinbuf = 0b00000000;
     for (;;) {
         start_sleep();
         for (int i = 0; i < 5000; i++) {
-            rs->dial_pinbuf = (rs->dial_pinbuf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
-            if (PINBUF_CHANGED_LOW(rs->dial_pinbuf)) {
-                rs->dial_pinbuf = 0b00000000;
-                rs->dial_pin_high = false;
+            rs->dial_pin.buf = (rs->dial_pin.buf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
+            if (PINBUF_CHANGED_LOW(rs->dial_pin.buf)) {
+                rs->dial_pin.buf = 0b00000000;
+                rs->dial_pin.high = false;
             }
-            if (!rs->dial_pin_high)
+            if (!rs->dial_pin.high)
                 break;
             _delay_us(100);
         }
-        if (rs->dial_pin_high) {
+        if (rs->dial_pin.high) {
             // Set INT0 bit back in GIMSK before looping back to sleep().
             GIMSK = _BV(INT0);
             continue;
         }
 
-        rs->dial_pinbuf = 0b00000000;
-        rs->dial_pin_high = false;
-        while (!rs->dial_pin_high) {
-            rs->pulse_pinbuf = (rs->pulse_pinbuf << 1) | (bit_is_set(PINB, PIN_PULSE) >> PIN_PULSE);
-            if (PINBUF_CHANGED_HIGH(rs->pulse_pinbuf)) {
-                rs->pulse_pinbuf = 0b11111111;
+        rs->dial_pin.buf = 0b00000000;
+        rs->dial_pin.high = false;
+        while (!rs->dial_pin.high) {
+            rs->pulse_pin.buf = (rs->pulse_pin.buf << 1) | (bit_is_set(PINB, PIN_PULSE) >> PIN_PULSE);
+            if (PINBUF_CHANGED_HIGH(rs->pulse_pin.buf)) {
+                rs->pulse_pin.buf = 0b11111111;
                 rs->dialed_digit++;
             }
             _delay_us(100);
-            rs->dial_pinbuf = (rs->dial_pinbuf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
-            if (PINBUF_CHANGED_HIGH(rs->dial_pinbuf)) {
-                rs->dial_pinbuf = 0b11111111;
-                rs->dial_pin_high = true;
+            rs->dial_pin.buf = (rs->dial_pin.buf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
+            if (PINBUF_CHANGED_HIGH(rs->dial_pin.buf)) {
+                rs->dial_pin.buf = 0b11111111;
+                rs->dial_pin.high = true;
             }
         }
         if (rs->dialed_digit > 0 && rs->dialed_digit <= 10) {
