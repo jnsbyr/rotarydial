@@ -72,6 +72,7 @@ typedef struct
     uint8_t dial_pinbuf;
     uint8_t pulse_pinbuf;
     bool dial_pin_down;
+    bool pulse_pin_down;
 } runstate_t;
 
 static void init(void);
@@ -130,18 +131,29 @@ int main(void)
     rs->pulse_pinbuf = 0b00000000;
     for (;;) {
         start_sleep();
-        // When wake up with INT0, INT0 bit is cleared in GIMSK.
-        // XXX: add a loop limit here?
-        while (!PINBUF_CHANGED_DOWN(rs->dial_pinbuf)) {
+        for (int i = 0; i < 5000; i++) {
             rs->dial_pinbuf = (rs->dial_pinbuf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
+            if (PINBUF_CHANGED_DOWN(rs->dial_pinbuf)) {
+                rs->dial_pinbuf = 0b00000000;
+                rs->dial_pin_down = true;
+            }
+            if (rs->dial_pin_down)
+                break;
             _delay_us(100);
         }
+        if (!rs->dial_pin_down) {
+            // Set INT0 bit back in GIMSK before looping back to sleep().
+            GIMSK = _BV(INT0);
+            continue;
+        }
+
         rs->dial_pinbuf = 0b00000000;
         rs->dial_pin_down = true;
         while (rs->dial_pin_down) {
             rs->pulse_pinbuf = (rs->pulse_pinbuf << 1) | (bit_is_set(PINB, PIN_PULSE) >> PIN_PULSE);
             if (PINBUF_CHANGED_UP(rs->pulse_pinbuf)) {
                 rs->pulse_pinbuf = 0b11111111;
+                rs->pulse_pin_down = false;
                 rs->dialed_digit++;
             }
             _delay_us(100);
