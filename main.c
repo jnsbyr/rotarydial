@@ -147,6 +147,7 @@ int main(void)
     rs->dial_pin.buf = 0b11111111;
     rs->dial_pin.high = true;
     rs->pulse_pin.buf = 0b00000000;
+    rs->pulse_pin.high = false;
     
     for (uint8_t i = 0; i < SPEED_DIAL_SIZE; i++)
         rs->speed_dial_digits[i] = DIGIT_OFF;
