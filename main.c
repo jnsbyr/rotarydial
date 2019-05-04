@@ -66,6 +66,7 @@ typedef struct
     uint8_t bit;
     uint8_t buf;
     bool high;
+    bool changed;
 } pin_t;
 
 typedef struct
@@ -107,6 +108,20 @@ const int8_t _g_speed_dial_loc[] =
 int8_t EEMEM _g_speed_dial_eeprom[SPEED_DIAL_COUNT][SPEED_DIAL_SIZE] = { [0 ... (SPEED_DIAL_COUNT - 1)][0 ... SPEED_DIAL_SIZE - 1] = DIGIT_OFF };
 runstate_t _g_run_state;
 
+void update_pin(pin_t *pin, uint16_t reg, uint8_t bit)
+{
+    pin->buf = (pin->buf << 1) | (bit_is_set(reg, bit) >> bit);
+    if (PINBUF_CHANGED_LOW(pin->buf)) {
+        pin->buf = 0b00000000;
+        pin->high = false;
+        pin->changed = true;
+    } else if (PINBUF_CHANGED_HIGH(pin->buf)) {
+        pin->buf = 0b11111111;
+        pin->high = true;
+        pin->changed = true;
+    }
+}
+
 int main(void)
 {
     runstate_t *rs = &_g_run_state;
@@ -138,11 +153,7 @@ int main(void)
     for (;;) {
         start_sleep();
         for (int i = 0; i < 5000; i++) {
-            rs->dial_pin.buf = (rs->dial_pin.buf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
-            if (PINBUF_CHANGED_LOW(rs->dial_pin.buf)) {
-                rs->dial_pin.buf = 0b00000000;
-                rs->dial_pin.high = false;
-            }
+            update_pin(&rs->dial_pin, PINB, PIN_DIAL);
             if (!rs->dial_pin.high)
                 break;
             _delay_us(100);
@@ -162,11 +173,7 @@ int main(void)
                 rs->dialed_digit++;
             }
             _delay_us(100);
-            rs->dial_pin.buf = (rs->dial_pin.buf << 1) | (bit_is_set(PINB, PIN_DIAL) >> PIN_DIAL);
-            if (PINBUF_CHANGED_HIGH(rs->dial_pin.buf)) {
-                rs->dial_pin.buf = 0b11111111;
-                rs->dial_pin.high = true;
-            }
+            update_pin(&rs->dial_pin, PINB, PIN_DIAL);
         }
         if (rs->dialed_digit > 0 && rs->dialed_digit <= 10) {
             if (rs->dialed_digit == 10)
