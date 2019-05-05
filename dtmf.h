@@ -32,10 +32,10 @@
 #define DIGIT_STAR          10
 #define DIGIT_POUND         11
 
-#define DTMF_DURATION_MS    500
+#define DTMF_DURATION_MS    200
 
-// PWM frequency = 4Mhz/256 = 15625Hz; overflow cycles per MS = 15
-#define T0_OVERFLOW_PER_MS  15
+// PWM frequency = 8Mhz/256 = 31250Hz; overflow cycles per MS = 31
+#define T0_OVERFLOW_PER_MS  31
 
 #define PIN_PWM_OUT         PB0     // PB0 (OC0A) as PWM output
 
