@@ -136,69 +136,69 @@ void dtmf_init(void)
 // Generate DTMF tone, duration x ms
 void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
 {
-  if (digit >= 0 && digit <= DIGIT_POUND)
-  {
-    // Standard digits 0-9, *, #
-    _g_stepwidth_a = auc_frequency[digit][0];
-    _g_stepwidth_b = auc_frequency[digit][1];
-    dtmf_enable_pwm();
+    if (digit >= 0 && digit <= DIGIT_POUND)
+    {
+        // Standard digits 0-9, *, #
+        _g_stepwidth_a = auc_frequency[digit][0];  
+        _g_stepwidth_b = auc_frequency[digit][1]; 
+        dtmf_enable_pwm();
 
-    // Wait x ms
-    sleep_ms(duration_ms);
-  }
-  else if (digit == DIGIT_BEEP)
-  {
-    // Beep ~1000Hz (66)
-    _g_stepwidth_a = 66;
+        // Wait x ms
+        sleep_ms(duration_ms);
+    } 
+    else if (digit == DIGIT_BEEP)
+    {
+        // Beep ~1000Hz (66)
+        _g_stepwidth_a = 66;  
+        _g_stepwidth_b = 0;
+        dtmf_enable_pwm();
+
+        // Wait x ms
+        sleep_ms(duration_ms);
+    }
+    else if (digit == DIGIT_BEEP_LOW)
+    {
+        // Beep ~500Hz (33)
+        _g_stepwidth_a = 33;  
+        _g_stepwidth_b = 0;
+        dtmf_enable_pwm();
+
+        // Wait x ms
+        sleep_ms(duration_ms);
+    }
+    else if (digit == DIGIT_TUNE_ASC)
+    {
+        _g_stepwidth_a = 34;    // C=523.25Hz  
+        _g_stepwidth_b = 0;
+        dtmf_enable_pwm();
+        
+        sleep_ms(duration_ms / 3);
+        _g_stepwidth_a = 43;    // E=659.26Hz
+        sleep_ms(duration_ms / 3);
+        _g_stepwidth_a = 51;    // G=784Hz
+        sleep_ms(duration_ms / 3);
+    }
+    else if (digit == DIGIT_TUNE_DESC)
+    {
+        _g_stepwidth_a = 51;    // G=784Hz
+        _g_stepwidth_b = 0;
+        dtmf_enable_pwm();
+
+        sleep_ms(duration_ms / 3);
+        _g_stepwidth_a = 43;    // E=659.26Hz
+        sleep_ms(duration_ms / 3);
+        _g_stepwidth_a = 34;    // C=523.25Hz  
+        sleep_ms(duration_ms / 3);
+    }
+
+    // Stop DTMF transmitting
+    // Disable PWM output (compare match mode 0) and force it to 0
+    TCCR0A &= ~_BV(COM0A1);
+    TCCR0A &= ~_BV(COM0A0);
+    PORTB &= ~_BV(PIN_PWM_OUT);
+    
+    _g_stepwidth_a = 0;
     _g_stepwidth_b = 0;
-    dtmf_enable_pwm();
-
-    // Wait x ms
-    sleep_ms(duration_ms);
-  }
-  else if (digit == DIGIT_BEEP_LOW)
-  {
-    // Beep ~500Hz (33)
-    _g_stepwidth_a = 33;
-    _g_stepwidth_b = 0;
-    dtmf_enable_pwm();
-
-    // Wait x ms
-    sleep_ms(duration_ms);
-  }
-  else if (digit == DIGIT_TUNE_ASC)
-  {
-    _g_stepwidth_a = 34;    // C=523.25Hz
-    _g_stepwidth_b = 0;
-    dtmf_enable_pwm();
-
-    sleep_ms(duration_ms / 3);
-    _g_stepwidth_a = 43;    // E=659.26Hz
-    sleep_ms(duration_ms / 3);
-    _g_stepwidth_a = 51;    // G=784Hz
-    sleep_ms(duration_ms / 3);
-  }
-  else if (digit == DIGIT_TUNE_DESC)
-  {
-    _g_stepwidth_a = 51;    // G=784Hz
-    _g_stepwidth_b = 0;
-    dtmf_enable_pwm();
-
-    sleep_ms(duration_ms / 3);
-    _g_stepwidth_a = 43;    // E=659.26Hz
-    sleep_ms(duration_ms / 3);
-    _g_stepwidth_a = 34;    // C=523.25Hz
-    sleep_ms(duration_ms / 3);
-  }
-
-  // Stop DTMF transmitting
-  // Disable PWM output (compare match mode 0) and force it to 0
-  TCCR0A &= ~_BV(COM0A1);
-  TCCR0A &= ~_BV(COM0A0);
-  PORTB &= ~_BV(PIN_PWM_OUT);
-
-  _g_stepwidth_a = 0;
-  _g_stepwidth_b = 0;
 }
 
 // Enable PWM output by configuring compare match mode - non inverting PWM

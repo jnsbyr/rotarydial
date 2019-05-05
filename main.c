@@ -31,8 +31,10 @@
 
 #include "dtmf.h" 
 
-#define PIN_DIAL                    PB1
-#define PIN_PULSE                   PB2
+#define PIN_DIAL                    PB2
+#define PIN_PULSE                   PB1
+#define PINBUF_CHANGED_HIGH(x_)     (((x_) & 0b11000111) == 0b00000111)
+#define PINBUF_CHANGED_LOW(x_)      (((x_) & 0b11000111) == 0b11000000)
 
 #define SF_DELAY_MS                 2000L
 #define PG_DELAY_MS                 4000L
@@ -56,6 +58,15 @@
 
 typedef struct
 {
+    uint16_t reg;
+    uint8_t bit;
+    uint8_t buf;
+    bool high;
+    bool changed;
+} pin_t;
+
+typedef struct
+{
     uint8_t state;
     uint8_t flags;
     bool dial_pin_state;
@@ -63,6 +74,9 @@ typedef struct
     uint8_t speed_dial_digit_index;
     int8_t speed_dial_digits[SPEED_DIAL_SIZE];
     int8_t dialed_digit;
+    pin_t dial_pin;
+    pin_t pulse_pin;
+    bool enable_int0;
 } runstate_t;
 
 static void init(void);
@@ -88,13 +102,28 @@ const int8_t _g_speed_dial_loc[] =
 int8_t EEMEM _g_speed_dial_eeprom[SPEED_DIAL_COUNT][SPEED_DIAL_SIZE] = { [0 ... (SPEED_DIAL_COUNT - 1)][0 ... SPEED_DIAL_SIZE - 1] = DIGIT_OFF };
 runstate_t _g_run_state;
 
+void update_pin(pin_t *pin, uint16_t reg, uint8_t bit)
+{
+    pin->buf = (pin->buf << 1) | (bit_is_set(reg, bit) >> bit);
+    if (PINBUF_CHANGED_LOW(pin->buf)) {
+        pin->buf = 0b00000000;
+        pin->high = false;
+        pin->changed = true;
+    } else if (PINBUF_CHANGED_HIGH(pin->buf)) {
+        pin->buf = 0b11111111;
+        pin->high = true;
+        pin->changed = true;
+    } else
+        pin->changed = false;
+}
+
 int main(void)
 {
     runstate_t *rs = &_g_run_state;
     bool dial_pin_prev_state;
 
-    init();
     dtmf_init();
+    init();
 
     // Local dial status variables 
     rs->state = STATE_DIAL;
@@ -103,12 +132,46 @@ int main(void)
     rs->speed_dial_digit_index = 0;
     rs->speed_dial_index = 0;
     dial_pin_prev_state = true;
+    rs->dial_pin.buf = 0b11111111;
+    rs->dial_pin.high = true;
+    rs->pulse_pin.buf = 0b00000000;
+    rs->pulse_pin.high = false;
     
     for (uint8_t i = 0; i < SPEED_DIAL_SIZE; i++)
         rs->speed_dial_digits[i] = DIGIT_OFF;
 
-    while (1)
-    {
+    for (;;) {
+        rs->enable_int0 = true;
+        GIMSK = _BV(INT0);
+        start_sleep();
+        if (!rs->enable_int0)
+            GIMSK = 0;
+        for (int i = 0; i < 5000; i++) {
+            update_pin(&rs->dial_pin, PINB, PIN_DIAL);
+            if (!rs->dial_pin.high)
+                break;
+            _delay_us(100);
+        }
+        if (rs->dial_pin.high)
+            continue;
+
+        rs->dial_pin.buf = 0b00000000;
+        rs->dial_pin.high = false;
+        while (!rs->dial_pin.high) {
+            update_pin(&rs->pulse_pin, PINB, PIN_PULSE);
+            if (rs->pulse_pin.high && rs->pulse_pin.changed)
+                rs->dialed_digit++;
+            _delay_us(100);
+            update_pin(&rs->dial_pin, PINB, PIN_DIAL);
+        }
+        if (rs->dialed_digit > 0 && rs->dialed_digit <= 10) {
+            if (rs->dialed_digit == 10)
+                rs->dialed_digit = 0;
+            process_dialed_digit(rs);
+        }
+        rs->dialed_digit = 0;
+    }
+#if 0
         rs->dial_pin_state = bit_is_set(PINB, PIN_DIAL);
 
         if (dial_pin_prev_state != rs->dial_pin_state) 
@@ -200,7 +263,7 @@ int main(void)
             sleep_mode();
         }
     }
-
+#endif
     return 0;
 }
 
@@ -329,37 +392,23 @@ static void init(void)
     // Disable unused modules to save power
     PRR = _BV(PRTIM1) | _BV(PRUSI) | _BV(PRADC);
     ACSR = _BV(ACD);
-    // Configure pin change interrupt
-    MCUCR = _BV(ISC01) | _BV(ISC00);         // Set INT0 for falling edge detection
-    GIMSK = _BV(INT0) | _BV(PCIE);           // Added INT0
-    PCMSK = _BV(PIN_DIAL) | _BV(PIN_PULSE);
     // Enable interrupts
     sei();                              
+}
+
+static void start_sleep(void)
+{
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    cli();                         // stop interrupts to ensure the BOD timed sequence executes as required
+    sleep_enable();
+    //sleep_bod_disable();            // disable brown-out detection (good for 20-25µA)
+    sei();                          // ensure interrupts enabled so we can wake up again
+    sleep_cpu();                    // go to sleep
+    sleep_disable();                // wake up here
 }
 
 // Handler for external interrupt on INT0 (PB2, pin 7)
 ISR(INT0_vect)
 {
-    if (!_g_run_state.dial_pin_state)
-    {
-        // Disabling SF detection
-        _g_run_state.flags = F_NONE;
-        // A pulse just started
-        _g_run_state.dialed_digit++;
-    }
-}
-
-// Interrupt handlers updated to new code convention
-// Interrupt initiated by pin change on any enabled pin
-ISR(PCINT0_vect)
-{
-    // Do nothing, just wake up MCU
-    _delay_us(1);
-}
-
-// Handler for any unspecified 'bad' interrupts
-ISR(BADISR_vect)
-{
-    // Do nothing, just wake up MCU
-    _delay_us(1);
+    _g_run_state.enable_int0 = false;
 }
