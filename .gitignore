@@ -1,6 +1,8 @@
+*.bin
+*.ipch
+.vscode/*
 *.hex
 *.elf
 *.o
 deps/
 .vscode/
-

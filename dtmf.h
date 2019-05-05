@@ -33,11 +33,13 @@
 #define DIGIT_POUND         11
 
 #define DTMF_DURATION_MS    200
-
+#define TIMER_CLK_DIV1              0x01    ///< Timer clocked at F_CPU
+#define TIMER_PRESCALE_MASK0        0x07    ///< Timer Prescaler Bit-Mask
+#define NUM_SAMPLES                 128     // Number of samples in lookup table
 // PWM frequency = 8Mhz/256 = 31250Hz; overflow cycles per MS = 31
 #define T0_OVERFLOW_PER_MS  31
 
-#define PIN_PWM_OUT         PB0     // PB0 (OC0A) as PWM output
+#define PIN_PWM_OUT                 PB0     // PB0 (OC0A) as PWM output
 
 void dtmf_init(void);
 void dtmf_generate_tone(int8_t digit, uint16_t duration_ms);
@@ -46,5 +48,3 @@ void sleep_ms(uint16_t msec);
 extern volatile uint32_t _g_delay_counter;
 
 #endif /* __DTMF_H__ */
-
-
