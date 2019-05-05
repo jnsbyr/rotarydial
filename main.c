@@ -83,6 +83,7 @@ static void init(void);
 static void process_dialed_digit(runstate_t *rs);
 static void dial_speed_dial_number(int8_t *speed_dial_digits, int8_t index);
 static void write_current_speed_dial(int8_t *speed_dial_digits, int8_t index);
+static void start_sleep(void);
 
 // Map speed dial numbers to memory locations
 const int8_t _g_speed_dial_loc[] =
@@ -387,8 +388,8 @@ static void init(void)
     CLKPR = _BV(CLKPCE);    
     // Write prescaler value with CLKPCE = 0
     CLKPR = 0x00;
-    // Disable Pull-ups - external HW debounce
-    PORTB = 0;
+    // Enable Pull-ups
+    PORTB |= (_BV(PIN_DIAL) | _BV(PIN_PULSE));
     // Disable unused modules to save power
     PRR = _BV(PRTIM1) | _BV(PRUSI) | _BV(PRADC);
     ACSR = _BV(ACD);
