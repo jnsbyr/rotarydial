@@ -80,6 +80,7 @@ typedef struct
     int8_t dialed_digit;
     pin_t dial_pin;
     pin_t pulse_pin;
+    bool enable_int0;
 } runstate_t;
 
 static void init(void);
@@ -133,7 +134,7 @@ int main(void)
     //wdt_timer_start(SLEEP_128MS);
     //start_sleep();
     //wdt_stop();
-    _delay_ms(128);
+    //_delay_ms(128);
     dtmf_init();
     init();
 
@@ -153,18 +154,19 @@ int main(void)
         rs->speed_dial_digits[i] = DIGIT_OFF;
 
     for (;;) {
+        rs->enable_int0 = true;
+        GIMSK = _BV(INT0);
         start_sleep();
+        if (!rs->enable_int0)
+            GIMSK = 0;
         for (int i = 0; i < 5000; i++) {
             update_pin(&rs->dial_pin, PINB, PIN_DIAL);
             if (!rs->dial_pin.high)
                 break;
             _delay_us(100);
         }
-        if (rs->dial_pin.high) {
-            // Set INT0 bit back in GIMSK before looping back to sleep().
-            GIMSK = _BV(INT0);
+        if (rs->dial_pin.high)
             continue;
-        }
 
         rs->dial_pin.buf = 0b00000000;
         rs->dial_pin.high = false;
@@ -181,8 +183,6 @@ int main(void)
             process_dialed_digit(rs);
         }
         rs->dialed_digit = 0;
-        // re-enable INT0.
-        GIMSK = _BV(INT0);
     }
 #if 0
         rs->dial_pin_state = bit_is_set(PINB, PIN_DIAL);
@@ -421,7 +421,7 @@ static void init(void)
 
     // Configure pin change interrupt
     //MCUCR = _BV(ISC01) | _BV(ISC00);         // Set INT0 for falling edge detection
-    GIMSK = _BV(INT0);
+    //GIMSK = _BV(INT0);
     //GIMSK = _BV(INT0) | _BV(PCIE);           // Added INT0
     //PCMSK = _BV(PIN_DIAL) | _BV(PIN_PULSE);
 
@@ -462,8 +462,8 @@ static void init(void)
 
 static void start_sleep(void)
 {
-    set_sleep_mode(SLEEP_MODE_IDLE);
-    cli();                          // stop interrupts to ensure the BOD timed sequence executes as required
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    cli();                         // stop interrupts to ensure the BOD timed sequence executes as required
     sleep_enable();
     //sleep_bod_disable();            // disable brown-out detection (good for 20-25µA)
     sei();                          // ensure interrupts enabled so we can wake up again
@@ -474,7 +474,7 @@ static void start_sleep(void)
 // Handler for external interrupt on INT0 (PB2, pin 7)
 ISR(INT0_vect)
 {
-    GIMSK = 0;
+    _g_run_state.enable_int0 = false;
 }
 
 // Handler for any unspecified 'bad' interrupts
