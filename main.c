@@ -148,7 +148,7 @@ int main(void)
         if (!rs->enable_int0)
             GICR = 0;
         for (int i = 0; i < 5000; i++) {
-            update_pin(&rs->dial_pin, PINB, PIN_DIAL);
+            update_pin(&rs->dial_pin, PIND, PIN_DIAL);
             if (!rs->dial_pin.high)
                 break;
             _delay_us(100);
@@ -159,11 +159,11 @@ int main(void)
         rs->dial_pin.buf = 0b00000000;
         rs->dial_pin.high = false;
         while (!rs->dial_pin.high) {
-            update_pin(&rs->pulse_pin, PINB, PIN_PULSE);
+            update_pin(&rs->pulse_pin, PIND, PIN_PULSE);
             if (rs->pulse_pin.high && rs->pulse_pin.changed)
                 rs->dialed_digit++;
             _delay_us(100);
-            update_pin(&rs->dial_pin, PINB, PIN_DIAL);
+            update_pin(&rs->dial_pin, PIND, PIN_DIAL);
         }
         if (rs->dialed_digit > 0 && rs->dialed_digit <= 10) {
             if (rs->dialed_digit == 10)
@@ -173,7 +173,7 @@ int main(void)
         rs->dialed_digit = 0;
     }
 #if 0
-        rs->dial_pin_state = bit_is_set(PINB, PIN_DIAL);
+        rs->dial_pin_state = bit_is_set(PIND, PIN_DIAL);
 
         if (dial_pin_prev_state != rs->dial_pin_state) 
         {
