@@ -117,12 +117,13 @@ volatile uint16_t _g_cur_sin_val_b;             // position freq. B in LUT (exte
 
 void dtmf_init(void)
 {
-  TIMSK = _BV(TOIE0);                 // Int T0 Overflow enabled
-  TCCR0A = _BV(WGM00) | _BV(WGM01);   // 8Bit PWM; Compare/match output mode configured later
-  TCCR0B = TIMER_PRESCALE_MASK0 & TIMER_CLK_DIV1;
-  TCNT0 = 0;
-  OCR0A = 0;
-  DDRB = _BV(PIN_PWM_OUT);    // PWM output (OC0A pin)
+  TIMSK = _BV(TOIE2);                 // Int T0 Overflow enabled
+  TCCR2 |= _BV(WGM20) | _BV(WGM21);   // 8Bit PWM; Compare/match output mode configured later
+  TCCR2 |= TIMER_PRESCALE_MASK0 & TIMER_CLK_DIV1;
+  TCNT2 = 0;
+  OCR2 = 0;
+  DDRB = _BV(PIN_PWM_OUT) | _BV(PB5);    // PWM output (OC2 pin)
+  PORTB |= _BV(PB5);
 
   _g_stepwidth_a = 0x00;
   _g_stepwidth_b = 0x00;
@@ -193,8 +194,8 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
 
     // Stop DTMF transmitting
     // Disable PWM output (compare match mode 0) and force it to 0
-    TCCR0A &= ~_BV(COM0A1);
-    TCCR0A &= ~_BV(COM0A0);
+    TCCR2 &= ~_BV(COM21);
+    TCCR2 &= ~_BV(COM20);
     PORTB &= ~_BV(PIN_PWM_OUT);
     
     _g_stepwidth_a = 0;
@@ -204,12 +205,12 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
 // Enable PWM output by configuring compare match mode - non inverting PWM
 static void dtmf_enable_pwm(void)
 {
-  TCCR0A |= _BV(COM0A1);
-  TCCR0A &= ~_BV(COM0A0);
+  TCCR2 |= _BV(COM21);
+  TCCR2 &= ~_BV(COM20);
 }
 
 // Timer overflow interrupt service routine
-ISR(TIMER0_OVF_vect)
+ISR(TIMER2_OVF_vect)
 {
   uint8_t sin_a;
   uint8_t sin_b;
@@ -237,7 +238,7 @@ ISR(TIMER0_OVF_vect)
   }
 
   // calculate PWM value: high frequency value + 3/4 low frequency value
-  OCR0A = (sin_a + (sin_b - (sin_b >> 2)));
+  OCR2 = (sin_a + (sin_b - (sin_b >> 2)));
   _g_delay_counter++;
 }
 

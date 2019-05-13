@@ -31,8 +31,8 @@
 
 #include "dtmf.h" 
 
-#define PIN_DIAL                    PB2
-#define PIN_PULSE                   PB1
+#define PIN_DIAL                    PD2
+#define PIN_PULSE                   PD3
 #define PINBUF_CHANGED_HIGH(x_)     (((x_) & 0b11000111) == 0b00000111)
 #define PINBUF_CHANGED_LOW(x_)      (((x_) & 0b11000111) == 0b11000000)
 
@@ -143,10 +143,10 @@ int main(void)
 
     for (;;) {
         rs->enable_int0 = true;
-        GIMSK = _BV(INT0);
+        GICR = _BV(INT0);
         start_sleep();
         if (!rs->enable_int0)
-            GIMSK = 0;
+            GICR = 0;
         for (int i = 0; i < 5000; i++) {
             update_pin(&rs->dial_pin, PINB, PIN_DIAL);
             if (!rs->dial_pin.high)
@@ -385,13 +385,13 @@ static void init(void)
 {
     // Program clock prescaller to divide + frequency by 1
     // Write CLKPCE 1 and other bits 0    
-    CLKPR = _BV(CLKPCE);    
+    //CLKPR = _BV(CLKPCE);    
     // Write prescaler value with CLKPCE = 0
-    CLKPR = 0x00;
+    //CLKPR = 0x00;
     // Enable Pull-ups
-    PORTB |= (_BV(PIN_DIAL) | _BV(PIN_PULSE));
+    PORTD |= (_BV(PIN_DIAL) | _BV(PIN_PULSE));
     // Disable unused modules to save power
-    PRR = _BV(PRTIM1) | _BV(PRUSI) | _BV(PRADC);
+    //PRR = _BV(PRTIM1) | _BV(PRUSI) | _BV(PRADC);
     ACSR = _BV(ACD);
     // Enable interrupts
     sei();                              
