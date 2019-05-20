@@ -151,7 +151,7 @@ int main(void)
             update_pin(&rs->dial_pin, PIND, PIN_DIAL);
             if (!rs->dial_pin.high)
                 break;
-            _delay_us(100);
+            sleep_ms(1);
         }
         if (rs->dial_pin.high)
             continue;
@@ -162,7 +162,7 @@ int main(void)
             update_pin(&rs->pulse_pin, PIND, PIN_PULSE);
             if (rs->pulse_pin.high && rs->pulse_pin.changed)
                 rs->dialed_digit++;
-            _delay_us(100);
+            sleep_ms(1);
             update_pin(&rs->dial_pin, PIND, PIN_DIAL);
         }
         if (rs->dialed_digit > 0 && rs->dialed_digit <= 10) {

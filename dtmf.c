@@ -29,8 +29,6 @@
 
 #include "dtmf.h"
 
-static void dtmf_enable_pwm(void);
-
 //************************** SIN TABLE *************************************
 // Samples table : one period sampled on 128 samples and
 // quantized on 7 bit
@@ -117,13 +115,12 @@ volatile uint16_t _g_cur_sin_val_b;             // position freq. B in LUT (exte
 
 void dtmf_init(void)
 {
-  TIMSK = _BV(TOIE2);                 // Int T0 Overflow enabled
-  TCCR2 |= _BV(WGM20) | _BV(WGM21);   // 8Bit PWM; Compare/match output mode configured later
-  TCCR2 |= TIMER_PRESCALE_MASK0 & TIMER_CLK_DIV1;
+  TIMSK = _BV(TOIE2);                 // Timer2 overflow interrupt enabled
+  TCCR2 |= _BV(WGM20) | _BV(WGM21) | _BV(COM21) | _BV(CS00);   // 8Bit non-inverting PWM with no prescaler.
   TCNT2 = 0;
   OCR2 = 0;
   DDRB = _BV(PIN_PWM_OUT) | _BV(PB5);    // PWM output (OC2 pin)
-  PORTB |= _BV(PB5);
+  PORTB |= _BV(PB5);  // Turn on LED at PB5.
 
   _g_stepwidth_a = 0x00;
   _g_stepwidth_b = 0x00;
@@ -142,7 +139,6 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
         // Standard digits 0-9, *, #
         _g_stepwidth_a = auc_frequency[digit][0];  
         _g_stepwidth_b = auc_frequency[digit][1]; 
-        dtmf_enable_pwm();
 
         // Wait x ms
         sleep_ms(duration_ms);
@@ -152,7 +148,6 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
         // Beep ~1000Hz (66)
         _g_stepwidth_a = 66;  
         _g_stepwidth_b = 0;
-        dtmf_enable_pwm();
 
         // Wait x ms
         sleep_ms(duration_ms);
@@ -162,7 +157,6 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
         // Beep ~500Hz (33)
         _g_stepwidth_a = 33;  
         _g_stepwidth_b = 0;
-        dtmf_enable_pwm();
 
         // Wait x ms
         sleep_ms(duration_ms);
@@ -171,7 +165,6 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
     {
         _g_stepwidth_a = 34;    // C=523.25Hz  
         _g_stepwidth_b = 0;
-        dtmf_enable_pwm();
         
         sleep_ms(duration_ms / 3);
         _g_stepwidth_a = 43;    // E=659.26Hz
@@ -183,7 +176,6 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
     {
         _g_stepwidth_a = 51;    // G=784Hz
         _g_stepwidth_b = 0;
-        dtmf_enable_pwm();
 
         sleep_ms(duration_ms / 3);
         _g_stepwidth_a = 43;    // E=659.26Hz
@@ -193,21 +185,10 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
     }
 
     // Stop DTMF transmitting
-    // Disable PWM output (compare match mode 0) and force it to 0
-    TCCR2 &= ~_BV(COM21);
-    TCCR2 &= ~_BV(COM20);
-    PORTB &= ~_BV(PIN_PWM_OUT);
-    
     _g_stepwidth_a = 0;
     _g_stepwidth_b = 0;
 }
 
-// Enable PWM output by configuring compare match mode - non inverting PWM
-static void dtmf_enable_pwm(void)
-{
-  TCCR2 |= _BV(COM21);
-  TCCR2 &= ~_BV(COM20);
-}
 
 // Timer overflow interrupt service routine
 ISR(TIMER2_OVF_vect)
