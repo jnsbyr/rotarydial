@@ -26,7 +26,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
-#include <util/delay.h>
 #include <avr/eeprom.h>
 
 #include "dtmf.h" 
@@ -68,8 +67,6 @@ typedef struct
 typedef struct
 {
     uint8_t state;
-    uint8_t flags;
-    bool dial_pin_state;
     uint8_t speed_dial_index;
     uint8_t speed_dial_digit_index;
     int8_t speed_dial_digits[SPEED_DIAL_SIZE];
@@ -77,6 +74,7 @@ typedef struct
     pin_t dial_pin;
     pin_t pulse_pin;
     bool enable_int0;
+    uint16_t hold_ms;
 } runstate_t;
 
 static void init(void);
@@ -127,12 +125,8 @@ int main(void)
     init();
 
     // Local dial status variables 
-    rs->state = STATE_DIAL;
-    rs->dial_pin_state = true;
-    rs->flags = F_NONE;
     rs->speed_dial_digit_index = 0;
     rs->speed_dial_index = 0;
-    dial_pin_prev_state = true;
     rs->dial_pin.buf = 0b11111111;
     rs->dial_pin.high = true;
     rs->pulse_pin.buf = 0b00000000;
@@ -156,12 +150,26 @@ int main(void)
         if (rs->dial_pin.high)
             continue;
 
+        rs->state = STATE_DIAL;
+        rs->hold_ms = 0;
+        rs->dialed_digit = 0;
         rs->dial_pin.buf = 0b00000000;
         rs->dial_pin.high = false;
         while (!rs->dial_pin.high) {
             update_pin(&rs->pulse_pin, PIND, PIN_PULSE);
             if (rs->pulse_pin.high && rs->pulse_pin.changed)
                 rs->dialed_digit++;
+            if (rs->dialed_digit == 0) {
+                rs->hold_ms++;
+                if (rs->hold_ms == SF_DELAY_MS) {
+                    rs->state = STATE_SPECIAL_L1;
+                    dtmf_generate_tone(DIGIT_BEEP_LOW, 200);
+                }
+                if (rs->hold_ms == PG_DELAY_MS) {
+                    rs->state = STATE_SPECIAL_L2;
+                    dtmf_generate_tone(DIGIT_TUNE_ASC, 200);
+                }
+            }
             sleep_ms(1);
             update_pin(&rs->dial_pin, PIND, PIN_DIAL);
         }
@@ -170,102 +178,8 @@ int main(void)
                 rs->dialed_digit = 0;
             process_dialed_digit(rs);
         }
-        rs->dialed_digit = 0;
     }
-#if 0
-        rs->dial_pin_state = bit_is_set(PIND, PIN_DIAL);
-
-        if (dial_pin_prev_state != rs->dial_pin_state) 
-        {
-            if (!rs->dial_pin_state) 
-            {
-                // Dial just started
-                // Enable special function detection
-                rs->flags |= F_DETECT_SPECIAL_L1;
-                rs->dialed_digit = 0;
-
-                sleep_ms(50);
-            }
-            else 
-            {
-                // Disable SF detection (should be already disabled)
-                rs->flags = F_NONE;
-
-                // Check that we detect a valid digit
-                if (rs->dialed_digit <= 0 || rs->dialed_digit > 10)
-                {
-                    // Should never happen - no pulses detected OR count more than 10 pulses
-                    rs->dialed_digit = DIGIT_OFF;                    
-                    // Do nothing
-                    sleep_ms(50);
-                }
-                else 
-                {
-                    // Got a valid digit - process it            
-                    if (rs->dialed_digit == 10)
-                        rs->dialed_digit = 0; // 10 pulses => 0
-
-                    process_dialed_digit(rs);
-                }
-            }    
-        } 
-        else 
-        {
-            if (rs->dial_pin_state) 
-            {
-                // Rotary dial at the rest position
-                // Reset all variables
-                rs->state = STATE_DIAL;
-                rs->flags = F_NONE;
-                rs->dialed_digit = DIGIT_OFF;
-            }
-        }
-
-        dial_pin_prev_state = rs->dial_pin_state;
-
-        // Don't power down if special function detection is active        
-        if (rs->flags & F_DETECT_SPECIAL_L1)
-        {
-            // SF detection in progress - we need timer to run (IDLE mode)
-            set_sleep_mode(SLEEP_MODE_IDLE);        
-            sleep_mode();
-
-            // Special function mode detected?
-            if (_g_delay_counter >= SF_DELAY_MS * T0_OVERFLOW_PER_MS)
-            {
-                // SF mode detected
-                rs->state = STATE_SPECIAL_L1;
-                rs->flags &= ~F_DETECT_SPECIAL_L1;
-                rs->flags |= F_DETECT_SPECIAL_L2;
-
-                // Indicate that we entered L1 SF mode with short beep
-                dtmf_generate_tone(DIGIT_BEEP_LOW, 200);
-            }
-        }
-        else if (rs->flags & F_DETECT_SPECIAL_L2)
-        {
-            set_sleep_mode(SLEEP_MODE_IDLE);        
-            sleep_mode();
-
-            if (_g_delay_counter >= PG_DELAY_MS * T0_OVERFLOW_PER_MS)
-            {
-                // SF mode detected
-                rs->state = STATE_SPECIAL_L2;
-                rs->flags &= ~F_DETECT_SPECIAL_L2;
-
-                // Indicate that we entered L2 SF mode with asc tone
-                dtmf_generate_tone(DIGIT_TUNE_ASC, 200);
-            }
-        }
-        else
-        {
-            // Don't need timer - sleep to power down mode
-            set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-            sleep_mode();
-        }
-    }
-#endif
-    return 0;
+    return 0;   // Must be unreachable.
 }
 
 static void process_dialed_digit(runstate_t *rs)
