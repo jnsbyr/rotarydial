@@ -44,10 +44,6 @@
 #define STATE_SPECIAL_L2            0x02
 #define STATE_PROGRAM_SD            0x03
 
-#define F_NONE                      0x00
-#define F_DETECT_SPECIAL_L1         0x01
-#define F_DETECT_SPECIAL_L2         0x02
-
 #define SPEED_DIAL_COUNT            8 // 8 Positions in total (Redail(3),4,5,6,7,8,9,0)
 #define SPEED_DIAL_REDIAL           (SPEED_DIAL_COUNT - 1)
 
