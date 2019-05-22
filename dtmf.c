@@ -115,12 +115,13 @@ volatile uint16_t _g_cur_sin_val_b;             // position freq. B in LUT (exte
 
 void dtmf_init(void)
 {
-  TIMSK = _BV(TOIE2);                 // Timer2 overflow interrupt enabled
-  TCCR2 |= _BV(WGM20) | _BV(WGM21) | _BV(COM21) | _BV(CS00);   // 8Bit non-inverting PWM with no prescaler.
+  TIMSK = _BV(TOIE2); // Timer2 overflow interrupt enabled
+  TCCR2 |= _BV(CS00); // prescaler = 1
   TCNT2 = 0;
   OCR2 = 0;
-  DDRB = _BV(PIN_PWM_OUT) | _BV(PB5);    // PWM output (OC2 pin)
-  PORTB |= _BV(PB5);  // Turn on LED at PB5.
+  // Turn on LED at PB5.
+  DDRB |= _BV(PB5);
+  PORTB |= _BV(PB5);
 
   _g_stepwidth_a = 0x00;
   _g_stepwidth_b = 0x00;
@@ -134,6 +135,9 @@ void dtmf_init(void)
 // Generate DTMF tone, duration x ms
 void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
 {
+    // Turn on PWM at PIN_PWM_OUT. 8Bit non-inverting PWM.
+    DDRB |= _BV(PIN_PWM_OUT);
+    TCCR2 |= _BV(WGM20) | _BV(WGM21) | _BV(COM21);
     if (digit >= 0 && digit <= DIGIT_POUND)
     {
         // Standard digits 0-9, *, #
@@ -187,6 +191,9 @@ void dtmf_generate_tone(int8_t digit, uint16_t duration_ms)
     // Stop DTMF transmitting
     _g_stepwidth_a = 0;
     _g_stepwidth_b = 0;
+    // Make PIN_PWM_OUT tri-state to prevent pulse clicks from coming into the speaker.
+    TCCR2 &= ~(_BV(WGM20) | _BV(WGM21) | _BV(COM21));
+    DDRB &= ~_BV(PIN_PWM_OUT);
 }
 
 
