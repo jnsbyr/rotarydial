@@ -14,6 +14,14 @@
 //                Cleaned up implementation, modified to work more like the
 //                Rotatone product.
 //
+// Modified     : borishim 2019-04-18
+//                https://github.com/borishim/rotarydial
+//                Modified for use with 8 MHz crystal.
+//
+// Modified     : Jens B. 2020-01-03
+//                https://github.com/jnsbyr/rotarydial
+//                Support 4 and 8 MHz crystals.
+//
 // This code is distributed under the GNU Public License
 // which can be found at http://www.gnu.org/licenses/gpl.txt
 //
@@ -33,13 +41,18 @@
 #define DIGIT_POUND         11
 
 #define DTMF_DURATION_MS    200
-#define TIMER_CLK_DIV1              0x01    ///< Timer clocked at F_CPU
-#define TIMER_PRESCALE_MASK0        0x07    ///< Timer Prescaler Bit-Mask
-#define NUM_SAMPLES                 128     // Number of samples in lookup table
-// PWM frequency = 8Mhz/256 = 31250Hz; overflow cycles per MS = 31
-#define T0_OVERFLOW_PER_MS  31
 
-#define PIN_PWM_OUT                 PB0     // PB0 (OC0A) as PWM output
+#define NUM_SAMPLES         128     // Number of samples in lookup table
+
+#if (CLOCK_SOURCE == 0 || F_CPU == 8000000L)
+// PWM frequency = 8MHz/256 = 31250Hz; overflow cycles per MS = 31
+#define T0_OVERFLOW_PER_MS  31
+#elif (F_CPU == 4000000L)
+// external clock, PWM frequency = 4MHz/256 = 15625Hz; overflow cycles per MS = 15
+#define T0_OVERFLOW_PER_MS  15
+#endif
+
+#define PIN_PWM_OUT         PB0     // PB0 (OC0A) as PWM output
 
 void dtmf_init(void);
 void dtmf_generate_tone(int8_t digit, uint16_t duration_ms);
