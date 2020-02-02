@@ -16,13 +16,13 @@ Arduino IDE 1.8.10
 
 ## Build
 
-Repository:    http://drazzy.com/package_drazzy.com_index.json
-Board Manager: ATTinyCore 1.3.3 by Spence Konde
-Board:         ATtiny25/45/85 => EFUSE 0xFF
-Chip:          ATtiny85 
-Clock:         4 MHz (external) => LFUSE 0xFD or 8 MHz (external) => LFUSE 0xFF
-B.O.D. Level:  disabled => bits 0..2 of HFUSE 0xDF
-Save EEPROM:   not retained => bit 3 of HFUSE 0xDF
+Repository:    http://drazzy.com/package_drazzy.com_index.json  
+Board Manager: ATTinyCore 1.3.3 by Spence Konde  
+Board:         ATtiny25/45/85 => EFUSE 0xFF  
+Chip:          ATtiny85  
+Clock:         4 MHz (external) => LFUSE 0xFD or 8 MHz (external) => LFUSE 0xFF  
+B.O.D. Level:  disabled => bits 0..2 of HFUSE 0xDF  
+Save EEPROM:   not retained => bit 3 of HFUSE 0xDF  
 
 ## ISP
 
@@ -101,7 +101,7 @@ The operation of the firmware is nearly identical to that of Matthew's, here is 
 * redial             -> hold 3 for 2 seconds (beep), release
 * speed dial         -> hold 0 or 4-9 for 2 seconds (beep), release
 * program speed dial -> hold 0 or 4-9 for 4 seconds (2 beeps), release, dial digits (beep), wait 4 seconds (beep), hangup
-* cancel             -> hold 0 ..0 for 6 seconds (beep), release
+* cancel             -> hold 0 .. 9 for 6 seconds (beep), release
 
 Redial and speed dial numbers can have up to 30 digits, but only redial supports \* and #. Redial repeats the last manually dialed number and is not affected by recalling a speed dial. The redial number is saved in RAM, the speed dial numbers are saved in EEPROM 4 seconds after the last dialed digit.
 
